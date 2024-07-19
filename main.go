@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/golang-jwt/jwt/v5"
 	_ "github.com/mattn/go-sqlite3"
 )
 
@@ -28,7 +29,86 @@ type ErrorResponse struct {
 	Error string `json:"error"`
 }
 
-//region NextDate
+type Claims struct {
+	PasswordHash string `json:"password_hash"`
+	jwt.RegisteredClaims
+}
+
+var jwtKey = []byte("my_secret_key")
+
+func generateJWT(passwordHash string) (string, error) {
+	expirationTime := time.Now().Add(8 * time.Hour)
+	claims := &Claims{
+		PasswordHash: passwordHash,
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(expirationTime),
+		},
+	}
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	tokenString, err := token.SignedString(jwtKey)
+	if err != nil {
+		return "", err
+	}
+	return tokenString, nil
+}
+
+func authMiddleware(next http.HandlerFunc) http.HandlerFunc {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		pass := os.Getenv("TODO_PASSWORD")
+		if len(pass) > 0 {
+			cookie, err := r.Cookie("token")
+			if err != nil {
+				http.Error(w, "Authentication required", http.StatusUnauthorized)
+				return
+			}
+
+			tokenString := cookie.Value
+			claims := &Claims{}
+			token, err := jwt.ParseWithClaims(tokenString, claims, func(token *jwt.Token) (interface{}, error) {
+				return jwtKey, nil
+			})
+
+			if err != nil || !token.Valid {
+				http.Error(w, "Authentication required", http.StatusUnauthorized)
+				return
+			}
+
+			if claims.PasswordHash != pass {
+				http.Error(w, "Authentication required", http.StatusUnauthorized)
+				return
+			}
+		}
+		next(w, r)
+	})
+}
+
+func signinHandler(w http.ResponseWriter, r *http.Request) {
+	var creds struct {
+		Password string `json:"password"`
+	}
+
+	err := json.NewDecoder(r.Body).Decode(&creds)
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, "Invalid request payload")
+		return
+	}
+
+	pass := os.Getenv("TODO_PASSWORD")
+	log.Printf("Received password: %s", creds.Password)
+	log.Printf("Expected password: %s", pass)
+	if creds.Password != pass {
+		respondWithError(w, http.StatusUnauthorized, "Неверный пароль")
+		return
+	}
+
+	token, err := generateJWT(creds.Password)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Failed to generate token")
+		return
+	}
+
+	json.NewEncoder(w).Encode(map[string]string{"token": token})
+}
 
 func NextDate(now time.Time, date string, repeat string) (string, error) {
 	if repeat == "" {
@@ -40,7 +120,6 @@ func NextDate(now time.Time, date string, repeat string) (string, error) {
 		return "", fmt.Errorf("invalid date format: %v", err)
 	}
 
-	// Разбор правила повторения
 	repeatParts := strings.Split(repeat, " ")
 	if len(repeatParts) < 1 || len(repeatParts) > 2 {
 		return "", fmt.Errorf("invalid repeat rule: %s", repeat)
@@ -76,10 +155,6 @@ func NextDate(now time.Time, date string, repeat string) (string, error) {
 		return "", fmt.Errorf("unsupported repeat rule: %s", rule)
 	}
 }
-
-//endregion NextDate
-
-//region addTaskHandler
 
 func addTaskHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
@@ -148,10 +223,6 @@ func addTaskHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(response)
 }
 
-//endregion addTaskHandler
-
-//region apiNextDateHandler
-
 func apiNextDateHandler(w http.ResponseWriter, r *http.Request) {
 	nowStr := r.FormValue("now")
 	dateStr := r.FormValue("date")
@@ -172,10 +243,6 @@ func apiNextDateHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/plain")
 	fmt.Fprint(w, nextDate)
 }
-
-//endregion apiNextDateHandler
-
-//region getTasksHandler
 
 func getTasksHandler(w http.ResponseWriter, r *http.Request) {
 	db, err := sql.Open("sqlite3", "scheduler.db")
@@ -236,10 +303,6 @@ func getTasksHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(response)
 }
 
-//endregion getTasksHandler
-
-//region getTaskHandler
-
 func getTaskHandler(w http.ResponseWriter, r *http.Request) {
 	id := r.URL.Query().Get("id")
 	if id == "" {
@@ -269,10 +332,6 @@ func getTaskHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(task)
 }
-
-//endregion getTaskHandler
-
-//region editTaskHandler
 
 func editTaskHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPut {
@@ -350,10 +409,6 @@ func editTaskHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]string{})
 }
 
-//endregion editTaskHandler
-
-//region doneTaskHandler
-
 func doneTaskHandler(w http.ResponseWriter, r *http.Request) {
 	id := r.URL.Query().Get("id")
 	if id == "" {
@@ -416,10 +471,6 @@ func doneTaskHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]string{})
 }
 
-//endregion doneTaskHandler
-
-//region deleteTaskHandler
-
 func deleteTaskHandler(w http.ResponseWriter, r *http.Request) {
 	id := r.URL.Query().Get("id")
 	if id == "" {
@@ -455,20 +506,12 @@ func deleteTaskHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]string{})
 }
 
-//endregion deleteTaskHandler
-
-//region respondWithError
-
 func respondWithError(w http.ResponseWriter, code int, message string) {
 	log.Printf("Error: %s", message)
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(code)
 	json.NewEncoder(w).Encode(map[string]string{"error": message})
 }
-
-//endregion respondWithError
-
-//region main
 
 func main() {
 	appPath, err := os.Getwd()
@@ -528,7 +571,8 @@ func main() {
 
 	http.Handle("/", http.FileServer(http.Dir(webDir)))
 	http.HandleFunc("/api/nextdate", apiNextDateHandler)
-	http.HandleFunc("/api/task", func(w http.ResponseWriter, r *http.Request) {
+	http.HandleFunc("/api/signin", signinHandler)
+	http.HandleFunc("/api/task", authMiddleware(func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case http.MethodGet:
 			getTaskHandler(w, r)
@@ -541,12 +585,10 @@ func main() {
 		default:
 			http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
 		}
-	})
-	http.HandleFunc("/api/tasks", getTasksHandler)
-	http.HandleFunc("/api/task/done", doneTaskHandler)
+	}))
+	http.HandleFunc("/api/tasks", authMiddleware(getTasksHandler))
+	http.HandleFunc("/api/task/done", authMiddleware(doneTaskHandler))
 
 	fmt.Printf("Запуск сервера на порту %s...\n", port)
 	log.Fatal(http.ListenAndServe(":"+port, nil))
 }
-
-//endregion main
