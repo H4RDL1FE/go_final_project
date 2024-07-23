@@ -1,13 +1,16 @@
 package main
 
 import (
-	"go_final_project/handlers"
-	"go_final_project/middleware"
-	"go_final_project/repository"
+	// Стандартные библиотеки
 	"log"
 	"net/http"
 	"os"
 	"path/filepath"
+
+	// Внутренние библиотеки
+	"go_final_project/handlers"
+	"go_final_project/middleware"
+	"go_final_project/repository"
 )
 
 func main() {

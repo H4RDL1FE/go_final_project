@@ -1,17 +1,20 @@
 package handlers
 
 import (
+	// Стандартные библиотеки
 	"encoding/json"
 	"fmt"
-	"go_final_project/model"
-	"go_final_project/repository"
 	"net/http"
 	"time"
+
+	// Внутренние библиотеки
+	"go_final_project/model"
+	"go_final_project/repository"
 )
 
 func AddTaskHandler(w http.ResponseWriter, r *http.Request, repo *repository.Repository) {
 	if r.Method != http.MethodPost {
-		http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
+		respondWithError(w, http.StatusMethodNotAllowed, "Invalid request method")
 		return
 	}
 
@@ -59,5 +62,7 @@ func AddTaskHandler(w http.ResponseWriter, r *http.Request, repo *repository.Rep
 
 	response := map[string]interface{}{"id": fmt.Sprintf("%d", id)}
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Error encoding response")
+	}
 }

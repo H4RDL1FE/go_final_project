@@ -1,12 +1,15 @@
 package middleware
 
 import (
+	// Стандартные библиотеки
 	"net/http"
 	"os"
 
-	"go_final_project/model"
-
+	// Внешние библиотеки
 	"github.com/golang-jwt/jwt/v5"
+
+	// Внутренние библиотеки
+	"go_final_project/model"
 )
 
 var jwtKey = []byte("my_secret_key")

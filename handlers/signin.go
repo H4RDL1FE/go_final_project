@@ -1,14 +1,17 @@
 package handlers
 
 import (
+	// Стандартные библиотеки
 	"encoding/json"
 	"net/http"
 	"os"
 	"time"
 
-	"go_final_project/model"
-
+	// Внешние библиотеки
 	"github.com/golang-jwt/jwt/v5"
+
+	// Внутренние библиотеки
+	"go_final_project/model"
 )
 
 var jwtKey = []byte("my_secret_key")
@@ -53,10 +56,9 @@ func SigninHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	json.NewEncoder(w).Encode(map[string]string{"token": token})
-}
 
-func respondWithError(w http.ResponseWriter, code int, message string) {
 	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(code)
-	json.NewEncoder(w).Encode(map[string]string{"error": message})
+	if err := json.NewEncoder(w).Encode(map[string]string{"token": token}); err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Error encoding response")
+	}
 }

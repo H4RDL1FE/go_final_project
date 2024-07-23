@@ -1,9 +1,12 @@
 package repository
 
 import (
+	// Стандартные библиотеки
 	"fmt"
-	"go_final_project/model"
 	"time"
+
+	// Внутренние библиотеки
+	"go_final_project/model"
 )
 
 func (r *Repository) AddTask(task model.Task) (int64, error) {

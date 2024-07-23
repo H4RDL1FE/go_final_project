@@ -1,10 +1,12 @@
 package handlers
 
 import (
+	// Стандартные библиотеки
 	"encoding/json"
-	"fmt"
-	"go_final_project/repository"
 	"net/http"
+
+	// Внутренние библиотеки
+	"go_final_project/repository"
 )
 
 func GetTaskHandler(w http.ResponseWriter, r *http.Request, repo *repository.Repository) {
@@ -16,10 +18,12 @@ func GetTaskHandler(w http.ResponseWriter, r *http.Request, repo *repository.Rep
 
 	task, err := repo.GetTask(id)
 	if err != nil {
-		respondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error retrieving task: %v", err))
+		respondWithError(w, http.StatusInternalServerError, "Ошибка при получении задачи")
 		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(task)
+	if err := json.NewEncoder(w).Encode(task); err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Error encoding response")
+	}
 }

@@ -1,18 +1,20 @@
 package handlers
 
 import (
-	"database/sql"
+	// Стандартные библиотеки
 	"encoding/json"
 	"fmt"
-	"go_final_project/model"
-	"go_final_project/repository"
 	"net/http"
 	"time"
+
+	// Внутренние библиотеки
+	"go_final_project/model"
+	"go_final_project/repository"
 )
 
 func EditTaskHandler(w http.ResponseWriter, r *http.Request, repo *repository.Repository) {
 	if r.Method != http.MethodPut {
-		http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
+		respondWithError(w, http.StatusMethodNotAllowed, "Invalid request method")
 		return
 	}
 
@@ -57,31 +59,14 @@ func EditTaskHandler(w http.ResponseWriter, r *http.Request, repo *repository.Re
 		}
 	}
 
-	db, err := sql.Open("sqlite3", "scheduler.db")
-	if err != nil {
-		respondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error opening database: %v", err))
-		return
-	}
-	defer db.Close()
-
-	query := `UPDATE scheduler SET date = ?, title = ?, comment = ?, repeat = ? WHERE id = ?`
-	res, err := db.Exec(query, task.Date, task.Title, task.Comment, task.Repeat, task.ID)
+	err = repo.EditTask(task)
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error updating task: %v", err))
 		return
 	}
 
-	rowsAffected, err := res.RowsAffected()
-	if err != nil {
-		respondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error retrieving rows affected: %v", err))
-		return
-	}
-
-	if rowsAffected == 0 {
-		respondWithError(w, http.StatusNotFound, "Задача не найдена")
-		return
-	}
-
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{})
+	if err := json.NewEncoder(w).Encode(map[string]string{"result": "success"}); err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Error encoding response")
+	}
 }

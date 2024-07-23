@@ -1,8 +1,10 @@
 package repository
 
 import (
+	// Стандартные библиотеки
 	"database/sql"
 
+	// Внешние библиотеки
 	_ "github.com/mattn/go-sqlite3"
 )
 

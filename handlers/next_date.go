@@ -1,6 +1,8 @@
 package handlers
 
 import (
+	// Стандартные библиотеки
+
 	"fmt"
 	"net/http"
 	"strconv"
@@ -72,5 +74,7 @@ func APINextDateHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "text/plain")
-	fmt.Fprint(w, nextDate)
+	if _, err := fmt.Fprint(w, nextDate); err != nil {
+		http.Error(w, "Error writing response", http.StatusInternalServerError)
+	}
 }

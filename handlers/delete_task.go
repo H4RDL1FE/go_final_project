@@ -1,11 +1,12 @@
 package handlers
 
 import (
-	"database/sql"
+	// Стандартные библиотеки
 	"encoding/json"
-	"fmt"
-	"go_final_project/repository"
 	"net/http"
+
+	// Внутренние библиотеки
+	"go_final_project/repository"
 )
 
 func DeleteTaskHandler(w http.ResponseWriter, r *http.Request, repo *repository.Repository) {
@@ -15,30 +16,14 @@ func DeleteTaskHandler(w http.ResponseWriter, r *http.Request, repo *repository.
 		return
 	}
 
-	db, err := sql.Open("sqlite3", "scheduler.db")
+	err := repo.DeleteTask(id)
 	if err != nil {
-		respondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error opening database: %v", err))
-		return
-	}
-	defer db.Close()
-
-	result, err := db.Exec("DELETE FROM scheduler WHERE id = ?", id)
-	if err != nil {
-		respondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error deleting task: %v", err))
-		return
-	}
-
-	rowsAffected, err := result.RowsAffected()
-	if err != nil {
-		respondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error getting rows affected: %v", err))
-		return
-	}
-
-	if rowsAffected == 0 {
-		respondWithError(w, http.StatusNotFound, "Задача не найдена")
+		respondWithError(w, http.StatusInternalServerError, "Ошибка при удалении задачи")
 		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{})
+	if err := json.NewEncoder(w).Encode(map[string]string{"result": "success"}); err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Error encoding response")
+	}
 }
